@@ -159,6 +159,11 @@ namespace StarterAssets
             JumpAndGravity();
             GroundedCheck();
             Move();
+
+            if (Input.GetKeyDown(KeyCode.P))
+{
+    _animator.SetTrigger("Punch");
+}
         }
 
         private void LateUpdate()
