@@ -1,20 +1,22 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using NUnit.Framework;
+
 // using Unity.Cinemachine;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    public static PlayerController Instance { get; private set; }
+    // public static PlayerController Instance { get; private set; }
 
     [Header("Components")]
     [SerializeField] Rigidbody rigidbody3D;
     [SerializeField] ConfigurableJoint mainJoint;
-    [SerializeField] Animator animator;
+    // [SerializeField] Animator animator;
 
     [Header("Settings")]
-    [SerializeField] float maxSpeed = 3f;
+    [SerializeField] float maxSpeed = 3;
     [SerializeField] float acceleration = 30f;
     [SerializeField] float jumpForce = 20f;
     [SerializeField] float rotationSpeed = 300f;
@@ -24,9 +26,11 @@ public class PlayerController : MonoBehaviour
     bool isGrounded = false;
     RaycastHit[] raycastHits = new RaycastHit[10];
 
+    SyncPhysicsObject[] syncPhysicsObjects;
     void Awake()
     {
-        Instance = this;
+        syncPhysicsObjects = GetComponentsInChildren<SyncPhysicsObject>();
+        // Instance = this;
     }
 
     void Start()
@@ -46,31 +50,21 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        CheckGrounded();
-        HandleMovement();
-        HandleRotation();
-        HandleJump();
-        UpdateAnimations();
+        // CheckGrounded();
+        // HandleMovement();
+        // HandleRotation();
+        // HandleJump();
+        // UpdateAnimations();
 
-        // Fall reset
-        if (transform.position.y < -10)
-        {
-            transform.position = Vector3.zero;
-            rigidbody3D.linearVelocity = Vector3.zero;
-        }
-    }
+        // // Fall reset
+        // if (transform.position.y < -10)
+        // {
+        //     transform.position = Vector3.zero;
+        //     rigidbody3D.linearVelocity = Vector3.zero;
+        // }
 
-    private void CheckGrounded()
-    {
         isGrounded = false;
-        int numberOfHits = Physics.SphereCastNonAlloc(
-            rigidbody3D.position,
-            0.1f,
-            -transform.up,
-            raycastHits,
-            0.5f
-        );
-
+        int numberOfHits = Physics.SphereCastNonAlloc(rigidbody3D.position, 0.1f, transform.up * -1, raycastHits, 0.5f);
         for (int i = 0; i < numberOfHits; i++)
         {
             if (raycastHits[i].transform.root == transform)
@@ -78,64 +72,39 @@ public class PlayerController : MonoBehaviour
 
             isGrounded = true;
             break;
-        }
+        };
 
         if (!isGrounded)
             rigidbody3D.AddForce(Vector3.down * 10f);
-    }
 
-    private void HandleMovement()
-    {
         float inputMagnitude = moveInputVector.magnitude;
         
-        // Calculate velocity relative to forward direction
-        float localForwardVelocity = Vector3.Dot(transform.forward, rigidbody3D.linearVelocity);
-
-        if (inputMagnitude > 0 && localForwardVelocity < maxSpeed)
+        if (inputMagnitude != 0)
         {
-            rigidbody3D.AddForce(transform.forward * inputMagnitude * acceleration);
+            Quaternion desiredRotation = Quaternion.LookRotation(new Vector3(moveInputVector.x, 0, moveInputVector.y * -1), transform.up);
+
+            mainJoint.targetRotation = Quaternion.RotateTowards(mainJoint.targetRotation, desiredRotation, Time.fixedDeltaTime * 300);
+
+            Vector3 localVelocifyVsForward = transform.forward * Vector3.Dot(transform.forward, rigidbody3D.linearVelocity);
+
+            float localForwardVelocity = localVelocifyVsForward.magnitude;
+
+            if (localForwardVelocity < maxSpeed)
+            {
+                rigidbody3D.AddForce(transform.forward * inputMagnitude * acceleration);
+            }
         }
-    }
 
-    private void HandleRotation()
-    {
-        if (moveInputVector.sqrMagnitude > 0.01f)
-        {
-            Quaternion desiredRotation = Quaternion.LookRotation(
-                new Vector3(moveInputVector.x, 0, moveInputVector.y), 
-                transform.up
-            );
-
-            mainJoint.targetRotation = Quaternion.RotateTowards(
-                mainJoint.targetRotation,
-                desiredRotation,
-                Time.fixedDeltaTime * rotationSpeed
-            );
-        }
-    }
-
-    private void HandleJump()
-    {
         if (isGrounded && isJumpButtonPressed)
         {
-            rigidbody3D.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+            rigidbody3D.AddForce(Vector3.up * 20, ForceMode.Impulse);
+            isJumpButtonPressed = false;
         }
-        isJumpButtonPressed = false; // Reset jump flag
-    }
 
-    private void UpdateAnimations()
-    {
-        float localForwardVelocity = Vector3.Dot(transform.forward, rigidbody3D.linearVelocity);
-        animator.SetFloat("movementSpeed", Mathf.Abs(localForwardVelocity) * 0.4f);
-    }
+        for (int i = 0; i < syncPhysicsObjects.Length; i++)
+        {
+            syncPhysicsObjects[i].UpdateJointFromAnimation();
+        }
 
-    // private void SetupCamera()
-    // {
-    //     CinemachineVirtualCamera vCam = FindFirstObjectByType<CinemachineVirtualCamera>();
-    //     if (vCam != null)
-    //     {
-    //         vCam.Follow = transform;
-    //         vCam.LookAt = transform;
-    //     }
-    // }
-}
+    }
+};
